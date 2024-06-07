@@ -27,6 +27,15 @@ public class ServerTCP{
         System.out.println(msg);
     }
 
+    public void sendMessagePrivate(String msg, String name, String whom){
+        for (ClientTCP clientTCP : clientTCPS){
+            if (clientTCP.getNickName().equals(whom)){
+                clientTCP.getOut().println("private msg from " + name + ": " + msg);
+                System.out.println("private msg from " + name + " to " + whom + ": " + msg);
+            }
+        }
+    }
+
     public void addClient() throws IOException {
         Socket socket = serverSocket.accept();
 
@@ -139,7 +148,30 @@ public class ServerTCP{
                             // Если сообщение null, это значит, что поток ввода закрыт
                             break;
                         }
-                        serverTCP.sendMsgAll(clientTCP.getNickName() + ": " + message, clientTCP.getNickName());
+                        switch (message){
+                            case "/privateMessage":
+                                clientTCP.getOut().println("type the user name: ");
+                                String reciver = clientTCP.getIn().readLine();
+                                boolean isFound = false;
+                                for (ClientTCP clientTCP1 : serverTCP.clientTCPS){
+                                    if (clientTCP1.getNickName().equals(reciver)){
+                                        isFound = true;
+                                        clientTCP.getOut().println("type message: ");
+                                        String privateMsg = clientTCP.getIn().readLine();
+                                        serverTCP.sendMessagePrivate(privateMsg, clientTCP.getNickName(), reciver);
+                                    }
+                                }
+                                if (!isFound){
+                                    clientTCP.getOut().println("user with name " + reciver + " not found");
+                                }
+                                break;
+                            case "/whoIam":
+                                clientTCP.getOut().println(clientTCP.getNickName());
+                                break;
+                            default:
+                                serverTCP.sendMsgAll(clientTCP.getNickName() + ": " + message, clientTCP.getNickName());
+                        }
+
                     }
                 } catch (IOException e) {
                     clientTCP.getOut().println("error");
