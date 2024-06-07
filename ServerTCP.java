@@ -8,6 +8,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class ServerTCP{
     ArrayList<ClientTCP> clientTCPS;
     ServerSocket serverSocket;
+    ArrayList<String> msgHistory = new ArrayList<>();
 
     public ServerTCP() throws IOException {
         clientTCPS = new ArrayList<>();
@@ -22,6 +23,7 @@ public class ServerTCP{
             clientTCP.getOut().println(msg);
             clientTCP.getOut().flush();
         }
+        msgHistory.add(msg);
         System.out.println(msg);
     }
 
@@ -45,12 +47,18 @@ public class ServerTCP{
     }
 
     public void deleteClientByName(String name) throws IOException {
-        for (ClientTCP clientTCP : clientTCPS){
-            if (clientTCP.getNickName().equals(name)){
+        boolean isFound = false;
+        for (ClientTCP clientTCP : clientTCPS) {
+            if (clientTCP.getNickName().equals(name)) {
                 clientTCP.getSocket().close();
+                clientTCPS.remove(clientTCP);
                 sendMsgAll("User " + clientTCP.getNickName() + " has been kicked", "admin");
-
+                isFound = true;
+                break;
             }
+        }
+        if (!isFound) {
+            System.out.println("No user with that name: " + name);
         }
     }
 
@@ -93,26 +101,17 @@ public class ServerTCP{
                 switch (command){
                     case "/getAllUsers":
                         serverTCP.getAllClients();
+                        break;
                     case "/kickUserByName":
-                        scanner.nextLine();
-                        String name = scanner.nextLine();
-                        Boolean isFound = false;
-                        for (ClientTCP clientTCP : serverTCP.clientTCPS){
-                            if (clientTCP.getNickName().equals(name)){
-                                try {
-                                    serverTCP.sendMsgAll("User " + clientTCP.getNickName() + " has been kicked", "admin");
-                                    clientTCP.getSocket().close();
-                                    isFound = true;
-                                    break;
-                                } catch (IOException e) {
-                                    throw new RuntimeException(e);
-                                }
-                            }
 
+                        String name = scanner.nextLine();
+
+                        try {
+                            serverTCP.deleteClientByName(name);
+                        } catch (IOException e) {
+                            throw new RuntimeException(e);
                         }
-                        if (!isFound){
-                            System.out.println("no user with that name: " + name);
-                        }
+                        break;
                     default:
                         System.out.println("no such command");
 
@@ -124,9 +123,15 @@ public class ServerTCP{
             serverTCP.addClient();
             System.out.println("new client has connected");
             ClientTCP clientTCP = serverTCP.clientTCPS.get(pos.get());
+            if (!serverTCP.msgHistory.isEmpty()){
+                for (String msg : serverTCP.msgHistory){
+                    clientTCP.getOut().println(msg);
+                }
+            }
 
             new Thread(() ->{
                 System.out.println("new thread");
+
                 try{
                     while (clientTCP.getSocket().isConnected()){
                         String message = clientTCP.getIn().readLine();
@@ -143,6 +148,7 @@ public class ServerTCP{
                     serverTCP.sendMsgAll(clientTCP.getNickName() + " has been disconnected", "server");
                     try {
                         clientTCP.getSocket().close();  // Закрытие сокета
+                        serverTCP.clientTCPS.remove(clientTCP);
                     } catch (IOException e) {
                         System.out.println("Error closing socket: " + e.getMessage());
                     }
